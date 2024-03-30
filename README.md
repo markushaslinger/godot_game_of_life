@@ -1,6 +1,8 @@
 # Conway's Game of Life
 
-Conway's **Game of Life** implementation in the **Godot Engine** (v4.2.1).
+Conway's **Game of Life** implementation in the **Godot Engine** (v4.3.dev4) using C#.
+
+> This is a (close to) 1:1 rewrite of upstream using C# instead of GDScript - all credit to the original author.
 
 ---
 
