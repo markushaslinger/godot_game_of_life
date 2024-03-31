@@ -4,6 +4,8 @@ Conway's **Game of Life** implementation in the **Godot Engine** (v4.3.dev4) usi
 
 > This is a (close to) 1:1 rewrite of upstream using C# instead of GDScript - all credit to the original author.
 
+> Adds runtime switching between different presets and random seeds 
+
 ---
 
 ## 👾 About Conway's Game of Life
