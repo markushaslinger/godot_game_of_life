@@ -1,11 +1,23 @@
-[gd_scene load_steps=13 format=3 uid="uid://b2ggo2gcy0jkw"]
+[gd_scene load_steps=20 format=3 uid="uid://b2ggo2gcy0jkw"]
 
 [ext_resource type="Script" path="res://src/GameOfLife.cs" id="1_pejux"]
 [ext_resource type="RDShaderFile" uid="uid://4grs3f1l3uu3" path="res://shaders/compute.glsl" id="2_4ylv5"]
 [ext_resource type="Shader" path="res://shaders/bit_matrix.gdshader" id="2_f8duc"]
 [ext_resource type="Texture2D" uid="uid://nqabo1yfqjrw" path="res://images/alive.png" id="3_2nbhm"]
+[ext_resource type="Texture2D" uid="uid://bfstslslj2rtv" path="res://images/samples/glider.png" id="3_sfrnp"]
 [ext_resource type="Texture2D" uid="uid://caibkov38dbve" path="res://images/dead.png" id="4_n85gg"]
+[ext_resource type="Texture2D" uid="uid://dlwtwykejag8k" path="res://images/samples/gosper_glider_cannon.png" id="4_x8tms"]
+[ext_resource type="Texture2D" uid="uid://guaouymcndpc" path="res://images/samples/pulsar.png" id="5_52c3v"]
 [ext_resource type="Texture2D" uid="uid://dlgnvkobqi4oi" path="res://images/white_pixel.png" id="5_p65oj"]
+[ext_resource type="Script" path="res://src/SampleTextures.cs" id="6_ysp1o"]
+[ext_resource type="Script" path="res://src/UIManager.cs" id="11_aay61"]
+[ext_resource type="Theme" uid="uid://mdexrkh78w5b" path="res://styles/button_theme.tres" id="11_vvq7d"]
+
+[sub_resource type="Resource" id="Resource_4hf5j"]
+script = ExtResource("6_ysp1o")
+GliderDataTexture = ExtResource("3_sfrnp")
+GosperGliderDataTexture = ExtResource("4_x8tms")
+PulsarDataTexture = ExtResource("5_52c3v")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sa8je"]
 resource_local_to_scene = true
@@ -31,20 +43,23 @@ top_radius = 5.0
 bottom_radius = 5.0
 height = 0.1
 
-[node name="GameOfLife" type="Control"]
+[node name="CanvasLayer" type="CanvasLayer"]
+
+[node name="GameOfLife" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_pejux")
 _aliveTexture = ExtResource("3_2nbhm")
+_binaryDataTextures = SubResource("Resource_4hf5j")
 _computeShaderFile = ExtResource("2_4ylv5")
 _deadTexture = ExtResource("4_n85gg")
 
-[node name="2DViewportContainer" type="SubViewportContainer" parent="."]
+[node name="2DViewportContainer" type="SubViewportContainer" parent="GameOfLife"]
 layout_mode = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="Viewport2D" type="SubViewport" parent="2DViewportContainer"]
+[node name="Viewport2D" type="SubViewport" parent="GameOfLife/2DViewportContainer"]
 unique_name_in_owner = true
 disable_3d = true
 own_world_3d = true
@@ -53,14 +68,13 @@ size = Vector2i(1024, 1024)
 size_2d_override = Vector2i(1024, 1024)
 render_target_update_mode = 4
 
-[node name="ViewportSprite" type="Sprite2D" parent="2DViewportContainer/Viewport2D"]
-unique_name_in_owner = true
+[node name="ViewportSprite" type="Sprite2D" parent="GameOfLife/2DViewportContainer/Viewport2D"]
 material = SubResource("ShaderMaterial_sa8je")
 scale = Vector2(1024, 1024)
 texture = ExtResource("5_p65oj")
 centered = false
 
-[node name="3DViewportContainer" type="SubViewportContainer" parent="."]
+[node name="3DViewportContainer" type="SubViewportContainer" parent="GameOfLife"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -72,35 +86,74 @@ grow_horizontal = 2
 grow_vertical = 2
 stretch = true
 
-[node name="Viewport3D" type="SubViewport" parent="3DViewportContainer"]
+[node name="Viewport3D" type="SubViewport" parent="GameOfLife/3DViewportContainer"]
 handle_input_locally = false
 size = Vector2i(1024, 1024)
 render_target_update_mode = 4
 
-[node name="3D" type="Node3D" parent="3DViewportContainer/Viewport3D"]
+[node name="3D" type="Node3D" parent="GameOfLife/3DViewportContainer/Viewport3D"]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="3DViewportContainer/Viewport3D/3D"]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="GameOfLife/3DViewportContainer/Viewport3D/3D"]
 environment = SubResource("Environment_c1ca7")
 
-[node name="Camera3D" type="Camera3D" parent="3DViewportContainer/Viewport3D/3D"]
+[node name="Camera3D" type="Camera3D" parent="GameOfLife/3DViewportContainer/Viewport3D/3D"]
 transform = Transform3D(1, 0, 0, 0, 0.573576, 0.819152, 0, -0.819152, 0.573576, 0, 1.58, 1.35)
 current = true
 fov = 55.0
 size = 1.65
 
-[node name="Torus" type="MeshInstance3D" parent="3DViewportContainer/Viewport3D/3D"]
-unique_name_in_owner = true
+[node name="Torus" type="MeshInstance3D" parent="GameOfLife/3DViewportContainer/Viewport3D/3D"]
 mesh = SubResource("TorusMesh_qgkix")
 skeleton = NodePath("../../../..")
 
-[node name="Base" type="MeshInstance3D" parent="3DViewportContainer/Viewport3D/3D"]
+[node name="Base" type="MeshInstance3D" parent="GameOfLife/3DViewportContainer/Viewport3D/3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.312553, 0)
 mesh = SubResource("CylinderMesh_xln1s")
 skeleton = NodePath("../../../..")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="3DViewportContainer/Viewport3D/3D"]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="GameOfLife/3DViewportContainer/Viewport3D/3D"]
 transform = Transform3D(1, 0, 0, 0, -0.268449, 0.963294, 0, -0.963294, -0.268449, 0, 4.06408, 4.80318)
 light_energy = 0.5
 light_bake_mode = 1
 shadow_enabled = true
 shadow_blur = 1.727
+
+[node name="ParentContainer" type="VBoxContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+
+[node name="ButtonContainer" type="HBoxContainer" parent="ParentContainer" node_paths=PackedStringArray("_gameOfLife")]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 0
+script = ExtResource("11_aay61")
+_gameOfLife = NodePath("../../GameOfLife")
+
+[node name="RandomBtn" type="Button" parent="ParentContainer/ButtonContainer"]
+layout_mode = 2
+theme = ExtResource("11_vvq7d")
+text = "Start with Random Cells"
+
+[node name="GliderBtn" type="Button" parent="ParentContainer/ButtonContainer"]
+layout_mode = 2
+theme = ExtResource("11_vvq7d")
+text = "Start Glider Demo"
+
+[node name="GosperGliderBtn" type="Button" parent="ParentContainer/ButtonContainer"]
+layout_mode = 2
+theme = ExtResource("11_vvq7d")
+text = "Start Gosper Glider Demo"
+
+[node name="PulsarBtn" type="Button" parent="ParentContainer/ButtonContainer"]
+layout_mode = 2
+theme = ExtResource("11_vvq7d")
+text = "Start Pulsar Demo"
+
+[connection signal="pressed" from="ParentContainer/ButtonContainer/RandomBtn" to="ParentContainer/ButtonContainer" method="HandleRandomModeButtonPressed"]
+[connection signal="pressed" from="ParentContainer/ButtonContainer/GliderBtn" to="ParentContainer/ButtonContainer" method="HandleGliderModeButtonPressed"]
+[connection signal="pressed" from="ParentContainer/ButtonContainer/GosperGliderBtn" to="ParentContainer/ButtonContainer" method="HandleGosperGliderModeButtonPressed"]
+[connection signal="pressed" from="ParentContainer/ButtonContainer/PulsarBtn" to="ParentContainer/ButtonContainer" method="HandlePulsarModeButtonPressed"]

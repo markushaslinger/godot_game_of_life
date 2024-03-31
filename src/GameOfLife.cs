@@ -7,8 +7,8 @@ public sealed partial class GameOfLife : Node
     [Export]
     private Texture2D _aliveTexture = default!;
 
-    [Export]
-    private Texture2D? _binaryDataTexture = default!;
+    [Export(PropertyHint.ResourceType, nameof(SampleTextures))]
+    private SampleTextures _binaryDataTextures = default!;
 
     [Export(PropertyHint.File, "*.glsl")]
     private RDShaderFile _computeShaderFile = default!;
@@ -17,6 +17,7 @@ public sealed partial class GameOfLife : Node
     private Texture2D _deadTexture = default!;
 
     private bool _firstTick;
+    private Rid _buffer;
     private RDTextureFormat _inputFormat = default!;
     private Image _inputImage = default!;
     private Rid _inputTexture;
@@ -28,7 +29,7 @@ public sealed partial class GameOfLife : Node
     private Image _outputImage = default!;
     private Rid _outputTexture;
     private Rid _pipeline;
-    private RenderingDevice _renderingDevice = default!;
+    private RenderingDevice? _renderingDevice;
     private ImageTexture _renderTexture = default!;
     private Rid _shader;
 
@@ -45,16 +46,17 @@ public sealed partial class GameOfLife : Node
     private Viewport _viewport = default!;
     private Sprite2D _viewportSprite = default!;
 
-    public override void _Ready()
+    public void Configure(Mode mode)
     {
-        _viewport = GetNodeOrNull<Viewport>("2DViewportContainer/Viewport2D")
-                    ?? throw new NullReferenceException("Node 'Viewport2D' not found.");
-        _viewportSprite = GetNodeOrNull<Sprite2D>("2DViewportContainer/Viewport2D/ViewportSprite")
-                          ?? throw new NullReferenceException("Node 'ViewportSprite' not found.");
-        _torus = GetNodeOrNull<MeshInstance3D>("3DViewportContainer/Viewport3D/3D/Torus")
-                 ?? throw new NullReferenceException("Node 'Torus' not found.");
-
-        _inputImage = GetInputImage();
+        _timer?.Stop();
+        
+        if (_renderingDevice is not null)
+        {
+            FreeRenderingResources(_renderingDevice);
+            _renderingDevice = null;
+        }
+        
+        (_squareSize, _inputImage) = GetInputImage(mode);
         _outputImage = Image.Create(_squareSize, _squareSize, false, Image.Format.L8);
         MergeInputAndOutputImages();
         SetShaderMaterialFromOutputImage();
@@ -64,7 +66,29 @@ public sealed partial class GameOfLife : Node
         _pipeline = _renderingDevice.ComputePipelineCreate(_shader);
         _inputFormat = GetBaseTextureFormat();
         _outputFormat = GetBaseTextureFormat();
-        ComputeBindings();
+        _buffer = ComputeBindings();
+        
+        _firstTick = true;
+        _timer?.Start();
+    }
+
+    private void FreeRenderingResources(RenderingDevice device)
+    {
+        device.FreeRid(_buffer);
+        device.FreeRid(_pipeline);
+        device.FreeRid(_shader);
+        device.FreeRid(_inputTexture);
+        device.FreeRid(_outputTexture);
+    }
+
+    public override void _Ready()
+    {
+        _viewport = GetNodeOrNull<Viewport>("2DViewportContainer/Viewport2D")
+                    ?? throw new NullReferenceException("Node 'Viewport2D' not found.");
+        _viewportSprite = GetNodeOrNull<Sprite2D>("2DViewportContainer/Viewport2D/ViewportSprite")
+                          ?? throw new NullReferenceException("Node 'ViewportSprite' not found.");
+        _torus = GetNodeOrNull<MeshInstance3D>("3DViewportContainer/Viewport3D/3D/Torus")
+                 ?? throw new NullReferenceException("Node 'Torus' not found.");
 
         _timer = new Timer
         {
@@ -73,10 +97,9 @@ public sealed partial class GameOfLife : Node
             Autostart = false
         };
         _timer.Timeout += TimerTick;
-
         AddChild(_timer);
-        _firstTick = true;
-        _timer.Start();
+        
+        Configure(Mode.Pulsar);
     }
 
     public override void _ExitTree()
@@ -112,6 +135,11 @@ public sealed partial class GameOfLife : Node
     {
         const uint Groups = 32;
 
+        if (_renderingDevice is null)
+        {
+            return;
+        }
+
         var computeList = _renderingDevice.ComputeListBegin();
 
         _renderingDevice.ComputeListBindComputePipeline(computeList, _pipeline);
@@ -123,6 +151,11 @@ public sealed partial class GameOfLife : Node
 
     private void Render()
     {
+        if (_renderingDevice is null)
+        {
+            return;
+        }
+
         _renderingDevice.Sync();
 
         var bytes = _renderingDevice.TextureGetData(_outputTexture, 0);
@@ -131,16 +164,32 @@ public sealed partial class GameOfLife : Node
         _renderTexture.Update(_outputImage);
     }
 
-    private Image GetInputImage()
+    private (int squareSize, Image image) GetInputImage(Mode mode)
     {
-        if (_binaryDataTexture is null)
+        return mode switch
+               {
+                   Mode.Random => (_squareSize, GetNoiseImage()),
+                   Mode.Glider => GetData(_binaryDataTextures.GliderDataTexture,
+                                          nameof(Mode.Glider)),
+                   Mode.GosperGlider => GetData(_binaryDataTextures.GosperGliderDataTexture,
+                                                nameof(Mode.GosperGlider)),
+                   Mode.Pulsar => GetData(_binaryDataTextures.PulsarDataTexture,
+                                          nameof(Mode.Pulsar)),
+                   _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+               };
+
+        static (int, Image) GetData(Texture2D? texture, string textureName)
         {
-            return GetNoiseImage();
+            if (texture is null)
+            {
+                throw new InvalidOperationException($"Texture {textureName} is not set");
+            }
+
+            var size = (int) texture.GetSize().X;
+            var image = texture.GetImage();
+
+            return (size, image);
         }
-
-        _squareSize = (int) _binaryDataTexture.GetSize().X;
-
-        return _binaryDataTexture.GetImage();
     }
 
     private Image GetNoiseImage()
@@ -197,14 +246,19 @@ public sealed partial class GameOfLife : Node
         _torus.SetSurfaceOverrideMaterial(0, material);
     }
 
-    private void ComputeBindings()
+    private Rid ComputeBindings()
     {
+        if (_renderingDevice is null)
+        {
+            return default;
+        }
+
         int[] input = [_squareSize, _squareSize];
         var inputBytes = new byte[input.Length * sizeof(int)];
         Buffer.BlockCopy(input, 0, inputBytes, 0, inputBytes.Length);
 
         var buffer = _renderingDevice.StorageBufferCreate((uint) inputBytes.Length, inputBytes);
-        var uniform = new RDUniform()
+        var uniform = new RDUniform
         {
             UniformType = RenderingDevice.UniformType.StorageBuffer,
             Binding = 0
@@ -218,10 +272,17 @@ public sealed partial class GameOfLife : Node
 
         _uniformSet = _renderingDevice.UniformSetCreate(new Array<RDUniform>(bindings),
                                                         _shader, 0);
+
+        return buffer;
     }
 
     private (Rid, RDUniform) CreateTextureAndBindUniform(Image image, RDTextureFormat format, int binding)
     {
+        if (_renderingDevice is null)
+        {
+            throw new InvalidOperationException("Rendering device is not set");
+        }
+
         var view = new RDTextureView();
         Array<byte[]> data = [image.GetData()];
         var texture = _renderingDevice.TextureCreate(format, view, data);
@@ -237,6 +298,11 @@ public sealed partial class GameOfLife : Node
 
     private Rid CreateShader()
     {
+        if (_renderingDevice is null)
+        {
+            throw new InvalidOperationException("Rendering device is not set");
+        }
+
         var spirV = _computeShaderFile.GetSpirV();
 
         return _renderingDevice.ShaderCreateFromSpirV(spirV);
@@ -252,4 +318,12 @@ public sealed partial class GameOfLife : Node
                         | RenderingDevice.TextureUsageBits.CanUpdateBit
                         | RenderingDevice.TextureUsageBits.CanCopyFromBit
         };
+}
+
+public enum Mode
+{
+    Glider,
+    GosperGlider,
+    Pulsar,
+    Random
 }

@@ -10,9 +10,9 @@ config_version=5
 
 [application]
 
-config/name="Game of Life"
+config/name="GameOfLife"
 run/main_scene="res://scenes/game-of-life.tscn"
-config/features=PackedStringArray("4.3", "Forward Plus")
+config/features=PackedStringArray("4.3", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [display]
@@ -25,7 +25,7 @@ window/stretch/mode="canvas_items"
 
 [dotnet]
 
-project/assembly_name="Game of Life"
+project/assembly_name="GameOfLife"
 
 [rendering]
 
